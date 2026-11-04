@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Moroccan Sweets Video</title>
+  <style>
+    :root {
+      --bg: #0f1115; --panel: #171a21; --panel-alt: #1e222b;
+      --accent: #7c5cff; --accent-hover: #6a4ae0;
+      --text: #e8e8ea; --muted: #9aa0a6; --border: #2a2f3a;
+      --success: #2ecc71; --error: #ff5252;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", sans-serif; background: var(--bg);
+      color: var(--text); padding: 24px; min-height: 100vh;
+    }
+    .container { max-width: 700px; margin: 0 auto; }
+    .header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 24px; padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .header h1 { font-size: 22px; }
+    .header a { color: var(--muted); text-decoration: none; font-size: 14px; }
+    .header a:hover { color: var(--accent); }
+    .panel {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 12px; padding: 24px;
+    }
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block; font-size: 12px; color: var(--muted);
+      margin-bottom: 6px; font-weight: 600;
+    }
+    .form-group select, .form-group input, .form-group textarea {
+      width: 100%; padding: 10px 12px; background: var(--panel-alt);
+      border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); font-size: 13px; font-family: inherit;
+    }
+    .form-group textarea { resize: vertical; min-height: 70px; }
+    .form-group select:focus, .form-group input:focus, .form-group textarea:focus {
+      outline: none; border-color: var(--accent);
+    }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .btn {
+      width: 100%; padding: 14px; background: var(--accent);
+      color: white; border: none; border-radius: 8px;
+      font-size: 15px; font-weight: 700; cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn:hover:not(:disabled) { background: var(--accent-hover); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .status {
+      margin-top: 16px; padding: 14px; border-radius: 8px;
+      text-align: center; min-height: 50px;
+      background: var(--panel-alt); font-size: 14px;
+    }
+    .status.success { background: rgba(46,204,113,0.15); color: var(--success); }
+    .status.error   { background: rgba(255,82,82,0.15);  color: var(--error); }
+    .status.info    { background: rgba(124,92,255,0.15); color: var(--accent); }
+    .spinner {
+      display: inline-block; width: 16px; height: 16px;
+      border: 2px solid var(--accent); border-top-color: transparent;
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+      vertical-align: middle; margin-left: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .examples { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+    .examples button {
+      padding: 6px 12px; background: var(--panel-alt); color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px;
+      cursor: pointer; font-size: 12px; font-family: inherit;
+    }
+    .examples button:hover { border-color: var(--accent); }
+    .note {
+      font-size: 12px; color: var(--muted);
+      margin-top: 12px; text-align: center; line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>🍯 مولد فيديوهات الحلوى المغربية</h1>
+    <a href="../index.html">← Back to Dashboard</a>
+  </div>
+
+  <div class="panel">
+    <div class="form-group">
+      <label>نوع الحلوى</label>
+      <textarea id="topic" placeholder="مثال: كعب الغزال المغربي باللوز وماء الزهر"></textarea>
+    </div>
+    <div class="examples" id="examples"></div>
+
+    <div class="row">
+      <div class="form-group">
+        <label>عدد المشاهد (2-3)</label>
+        <input type="number" id="scenes" value="3" min="2" max="3">
+      </div>
+      <div class="form-group">
+        <label>محرك البحث</label>
+        <select id="image_source">
+          <option value="DuckDuckGo" selected>DuckDuckGo</option>
+          <option value="Bing">Bing</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="form-group">
+        <label>اللغة</label>
+        <select id="lang">
+          <option value="العربية" selected>العربية</option>
+          <option value="Français">Français</option>
+          <option value="English">English</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>الصوت</label>
+        <select id="voice"></select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>سرعة الصوت</label>
+      <select id="rate">
+        <option value="بطيء">بطيء</option>
+        <option value="عادي" selected>عادي</option>
+        <option value="سريع">سريع</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Groq API Key</label>
+      <input type="password" id="groq_key" placeholder="gsk_...">
+    </div>
+
+    <button class="btn" id="btn-generate">🎬 إنتاج الفيديو</button>
+    <div class="status" id="status">جاهز</div>
+
+    <p class="note">
+      ⚠️ التوليد على الخادم — قد يأخذ 15–25 ثانية.<br>
+      2–3 مشاهد فقط (نفس فكرة "Max 20 puzzles" في Sudoku).
+    </p>
+  </div>
+</div>
+
+<script>
+const LANG_VOICES = {
+  "العربية": {
+    "🇸🇦 حامد (رجل)":"ar-SA-HamedNeural",
+    "🇸🇦 زارية (امرأة)":"ar-SA-ZariyahNeural",
+    "🇲🇦 جمال (رجل)":"ar-MA-JamalNeural",
+    "🇲🇦 منى (امرأة)":"ar-MA-MounaNeural",
+    "🇪🇬 شاكر (رجل)":"ar-EG-ShakirNeural",
+    "🇪🇬 سلمى (امرأة)":"ar-EG-SalmaNeural"
+  },
+  "Français":{"Henri (homme)":"fr-FR-HenriNeural","Denise (femme)":"fr-FR-DeniseNeural"},
+  "English":{"Guy (male)":"en-US-GuyNeural","Jenny (female)":"en-US-JennyNeural"}
+};
+const EXAMPLES = [
+  ["🌙 كعب الغزال","كعب الغزال المغربي باللوز وماء الزهر"],
+  ["🍯 الشباكية","الشباكية المغربية بالعسل والسمسم"],
+  ["🥮 الغريبة","الغريبة المغربية باللوز أو السمسم"],
+  ["🍪 الفقاص","الفقاص المغربي باللوز والسمسم"],
+  ["🌰 سلو","طريقة تحضير سلو المغربي"],
+  ["🍬 المقروط","المقروط المغربي بالتمر"]
+];
+
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const statusEl = $("status");
+  const btn = $("btn-generate");
+
+  // أمثلة
+  EXAMPLES.forEach(([label, text]) => {
+    const b = document.createElement("button");
+    b.textContent = label;
+    b.onclick = (e) => { e.preventDefault(); $("topic").value = text; };
+    $("examples").appendChild(b);
+  });
+
+  // الأصوات
+  function refreshVoices() {
+    const vs = LANG_VOICES[$("lang").value] || {};
+    $("voice").innerHTML = Object.keys(vs)
+      .map(k => `<option value="${k}">${k}</option>`).join("");
+  }
+  $("lang").addEventListener("change", refreshVoices);
+  refreshVoices();
+  $("groq_key").value = localStorage.getItem("groq_key") || "";
+
+  function setStatus(html, type) {
+    statusEl.className = "status " + (type || "");
+    statusEl.innerHTML = html;
+  }
+
+  async function generate() {
+    const licenseKey = localStorage.getItem("puzzle_license_key");
+    if (!licenseKey) { location.href = "../index.html"; return; }
+
+    const groq_key = $("groq_key").value.trim();
+    if (!groq_key) {
+      setStatus("أدخل مفتاح Groq.", "error");
+      return;
+    }
+    localStorage.setItem("groq_key", groq_key);
+
+    const options = {
+      licenseKey,
+      topic: $("topic").value.trim(),
+      scenes: parseInt($("scenes").value, 10) || 3,
+      lang: $("lang").value,
+      voice_label: $("voice").value,
+      rate: $("rate").value,
+      image_source: $("image_source").value,
+      groq_key,
+    };
+    if (!options.topic) {
+      setStatus("اكتب نوع الحلوى أولاً.", "error");
+      return;
+    }
+
+    btn.disabled = true;
+    setStatus('⏳ Generating on server... <span class="spinner"></span>', "info");
+
+    try {
+      const response = await fetch("/.netlify/functions/moroccan-generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(options),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        const messages = {
+          invalid_key: "مفتاح غير صالح.",
+          refunded: "تم استرداد هذا الشراء.",
+          unauthorized: "غير مصرح — سجّل الدخول مجدداً.",
+          generation_failed: "فشل التوليد على الخادم.",
+          missing_groq_key: "أدخل مفتاح Groq.",
+        };
+        throw new Error(messages[err.error] || err.error || err.message || "خطأ");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const title = decodeURIComponent(response.headers.get("X-Video-Title") || "moroccan");
+      a.href = url;
+      a.download = `${title.replace(/\s+/g, "_")}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setStatus("✅ الفيديو جاهز وتم تحميله.", "success");
+    } catch (err) {
+      console.error(err);
+      setStatus("❌ " + err.message, "error");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  btn.addEventListener("click", generate);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Moroccan Sweets Video</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Lock Screen -->
+  <div id="license-overlay" class="license-overlay">
+    <div class="license-card">
+      <div class="license-icon">🔒</div>
+      <h1>Activate Moroccan Sweets Video</h1>
+      <p>Please enter the license key you received after purchasing from Gumroad.</p>
+      <input
+        type="text"
+        id="license-key-input"
+        placeholder="XXXX-XXXX-XXXX-XXXX"
+        autocomplete="off"
+        spellcheck="false">
+      <button id="activate-btn" onclick="activateLicense()">Activate Now</button>
+      <p id="status-message"></p>
+      <a class="buy-link"
+         href="https://YOUR-USERNAME.gumroad.com/l/YOUR-PRODUCT-SLUG"
+         target="_blank" rel="noopener">
+        Haven't purchased yet? Get it on Gumroad
+      </a>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboard" class="dashboard" style="display:none;">
+    <header class="dashboard-header">
+      <h1>Moroccan Sweets Video</h1>
+      <p>AI-powered video generator — Secured by Gumroad licenses</p>
+    </header>
+
+    <main class="tools-grid">
+      <article class="tool-card"
+               data-tool="moroccan"
+               onclick="location.href='tools/moroccan-sweets.html'"
+               style="cursor:pointer;">
+        <div class="tool-icon">🍯</div>
+        <h2>Moroccan Sweets</h2>
+        <p>مولد فيديوهات الحلوى المغربية</p>
+        <span class="badge badge-ready">Ready</span>
+      </article>
+    </main>
+
+    <footer class="dashboard-footer">
+      <button class="logout-btn" onclick="logoutLicense()">
+        Log out from this device
+      </button>
+    </footer>
+  </div>
+
+  <script src="js/auth.js"></script>
+</body>
+</html>
