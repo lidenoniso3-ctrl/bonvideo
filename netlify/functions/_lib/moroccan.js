@@ -3,13 +3,21 @@
 const fs   = require("fs");
 const os   = require("os");
 const path = require("path");
-const { execFileSync, spawnSync } = require("child_process");
+const { spawnSync } = require("child_process");
 const FFMPEG = require("ffmpeg-static");
-
 const { MsEdgeTTS, OUTPUT_FORMAT } = require("msedge-tts");
 
 // =============================================================================
-// 1. الثوابت
+// 1. الموديلات — Groq (خطة مجانية 2026)
+// =============================================================================
+const MODELS = [
+  "openai/gpt-oss-120b",        // ← الافتراضي (متاح مجاناً)
+  "openai/gpt-oss-20b",         // بديل أسرع
+  "llama-3.1-8b-instant",       // بديل احتياطي
+];
+
+// =============================================================================
+// 2. اللغات والأصوات
 // =============================================================================
 const LANGUAGES = {
   "العربية": {
@@ -43,10 +51,9 @@ const USER_AGENT =
   "AppleWebKit/537.36 (KHTML, like Gecko) " +
   "Chrome/120.0.0.0 Safari/537.36";
 
-// حدود ملائمة لمهلة Netlify المتزامنة (نفس فكرة "Max 20 puzzles" في Sudoku)
 const LIMITS = {
-  scenes: { min: 2, max: 3 },     // ← هنا الضبط
-  resolution: [640, 360],          // 480p آمن
+  scenes: { min: 2, max: 3 },
+  resolution: [640, 360],
   fps: 24,
   maxSecondsPerScene: 5,
   crf: 28,
@@ -54,7 +61,7 @@ const LIMITS = {
 };
 
 // =============================================================================
-// 2. أدوات نصية
+// 3. أدوات نصية
 // =============================================================================
 function cleanText(t) {
   t = (t || "").replace(/[\*#_`~>\[\]{}|]/g, "");
@@ -65,19 +72,9 @@ function cleanText(t) {
 function hasArabic(t) { return /[\u0600-\u06ff]/.test(t); }
 
 // =============================================================================
-// 3. Groq — كتابة السكريبت
+// 4. Groq — كتابة السكريبت (مع سلسلة بدائل)
 // =============================================================================
-async function generateScript(apiKey, model, topic, langName, nScenes, log) {
-  const system =
-    "You are an expert Moroccan pastry chef and scriptwriter.\n" +
-    'Return ONLY JSON: {"title": "...", "scenes": [{"narration": "...", ' +
-    '"search_query": "...", "media": "photo"}]}\n' +
-    `- Write title & narration in ${langName}.\n` +
-    `- Exactly ${nScenes} scenes.\n` +
-    "- Each narration 1-2 short sentences, max 35 words.\n" +
-    "- search_query MUST be in English, 3-6 words, specific.\n" +
-    "- Never use generic words alone.";
-
+async function callGroq(apiKey, model, system, user, log) {
   const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -88,39 +85,91 @@ async function generateScript(apiKey, model, topic, langName, nScenes, log) {
       model,
       messages: [
         { role: "system", content: system },
-        { role: "user",   content: `Topic: ${topic}` },
+        { role: "user",   content: user },
       ],
       temperature: 0.7,
-      max_tokens: 1024,
+      max_tokens: 4096,          // ← رُفع للـ reasoning model
       response_format: { type: "json_object" },
     }),
   });
 
   if (!r.ok) {
     const txt = await r.text();
-    throw new Error(`Groq: (${r.status}) ${txt.slice(0, 200)}`);
+    const err = new Error(`Groq ${model}: (${r.status}) ${txt.slice(0, 250)}`);
+    err.status = r.status;
+    err.body = txt;
+    throw err;
   }
   const j = await r.json();
-  const raw = j.choices[0].message.content;
-  const m = raw.match(/\{[\s\S]*\}/);
-  const data = JSON.parse(m ? m[0] : raw);
+  return j.choices[0].message.content;
+}
 
-  const scenes = [];
-  for (const sc of data.scenes || []) {
-    const n = cleanText(sc.narration);
-    if (!n) continue;
-    const q = cleanText(sc.search_query) || "moroccan sweets";
-    scenes.push({ narration: n, search_query: q });
+function isModelUnavailable(err) {
+  if (err.status === 404) return true;
+  if (err.status === 410) return true;
+  const body = (err.body || "").toLowerCase();
+  return body.includes("model_not_found") ||
+         body.includes("does not exist") ||
+         body.includes("deprecat") ||
+         body.includes("no access");
+}
+
+async function generateScript(apiKey, requestedModel, topic, langName, nScenes, log) {
+  const system =
+    "You are an expert Moroccan pastry chef and scriptwriter.\n" +
+    'Return ONLY JSON: {"title": "...", "scenes": [{"narration": "...", ' +
+    '"search_query": "...", "media": "photo"}]}\n' +
+    `- Write title & narration in ${langName}.\n` +
+    `- Exactly ${nScenes} scenes.\n` +
+    "- Each narration 1-2 short sentences, max 35 words.\n" +
+    "- search_query MUST be in English, 3-6 words, specific.\n" +
+    "- Never use generic words alone.";
+  const user = `Topic: ${topic}`;
+
+  // جرّب الموديل المطلوب، ثم سلسلة البدائل
+  const candidates = [];
+  if (requestedModel) candidates.push(requestedModel);
+  for (const m of MODELS) {
+    if (!candidates.includes(m)) candidates.push(m);
   }
-  if (scenes.length < 2) throw new Error("السكريبت قصير جداً.");
-  return {
-    title: cleanText(data.title) || topic.slice(0, 60),
-    scenes: scenes.slice(0, LIMITS.scenes.max),
-  };
+
+  let lastErr = null;
+  for (let i = 0; i < candidates.length; i++) {
+    const model = candidates[i];
+    try {
+      const raw = await callGroq(apiKey, model, system, user, log);
+      const match = raw.match(/\{[\s\S]*\}/);
+      const data = JSON.parse(match ? match[0] : raw);
+
+      const scenes = [];
+      for (const sc of data.scenes || []) {
+        const n = cleanText(sc.narration);
+        if (!n) continue;
+        const q = cleanText(sc.search_query) || "moroccan sweets";
+        scenes.push({ narration: n, search_query: q });
+      }
+      if (scenes.length < 2) throw new Error("السكريبت قصير جداً.");
+
+      if (i > 0) log(`✅ استُخدم الموديل البديل: ${model}`);
+      return {
+        title: cleanText(data.title) || topic.slice(0, 60),
+        scenes: scenes.slice(0, LIMITS.scenes.max),
+        model,
+      };
+    } catch (e) {
+      lastErr = e;
+      if (isModelUnavailable(e) && i < candidates.length - 1) {
+        log(`⚠️ ${model} غير متاح — تجربة ${candidates[i + 1]}...`);
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastErr || new Error("فشل الاتصال بـ Groq");
 }
 
 // =============================================================================
-// 4. جلب الصور (HTML scraping — لا مكتبات إضافية)
+// 5. جلب الصور
 // =============================================================================
 async function downloadImage(url, savePath) {
   try {
@@ -147,7 +196,6 @@ async function tryDuckDuckGo(query, savePath) {
     );
     if (!r.ok) return false;
     const html = await r.text();
-    // استخرج vqd token
     const vqdMatch = html.match(/vqd=["']?([\d-]+)["']?/);
     if (!vqdMatch) return false;
     const vqd = vqdMatch[1];
@@ -209,10 +257,9 @@ async function fetchSceneImage(scene, jobDir, idx, preferred, log) {
 }
 
 // =============================================================================
-// 5. TTS
+// 6. TTS
 // =============================================================================
 async function synthesize(text, voice, rate, outPath, log) {
-  // msedge-tts (نفس backend الذي يستخدمه edge-tts في Python)
   try {
     const tts = new MsEdgeTTS();
     await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
@@ -225,7 +272,6 @@ async function synthesize(text, voice, rate, outPath, log) {
     log(`⚠️ edge-tts: ${e.message}`);
   }
 
-  // Fallback: Google Translate TTS (لا يحتاج مفتاحاً)
   const langCode = voice.split("-")[0];
   const chunks = [];
   for (let i = 0; i < text.length; i += 180) chunks.push(text.slice(i, i + 180));
@@ -242,7 +288,7 @@ async function synthesize(text, voice, rate, outPath, log) {
 }
 
 // =============================================================================
-// 6. FFmpeg
+// 7. FFmpeg
 // =============================================================================
 function runFFmpeg(args) {
   if (!FFMPEG) throw new Error("FFmpeg غير متوفر.");
@@ -302,7 +348,7 @@ function concatClips(clipPaths, outPath, workDir) {
 }
 
 // =============================================================================
-// 7. Pipeline
+// 8. Pipeline
 // =============================================================================
 async function runPipeline(opts) {
   const log = opts.log || console.log;
@@ -315,9 +361,8 @@ async function runPipeline(opts) {
     const script = await generateScript(
       opts.groq_key, opts.model, opts.topic, lang.llm, opts.scenes, log
     );
-    log(`✅ ${script.title} (${script.scenes.length} مشاهد)`);
+    log(`✅ ${script.title} (${script.scenes.length} مشاهد) — موديل: ${script.model}`);
 
-    // صور
     const imagePaths = [];
     for (let i = 0; i < script.scenes.length; i++) {
       log(`🖼️ تحميل صورة مشهد ${i + 1}...`);
@@ -328,7 +373,6 @@ async function runPipeline(opts) {
       imagePaths.push(p);
     }
 
-    // صوت
     const audioPaths = [];
     const durations  = [];
     for (let i = 0; i < script.scenes.length; i++) {
@@ -343,7 +387,6 @@ async function runPipeline(opts) {
       durations.push(Math.min(LIMITS.maxSecondsPerScene, Math.max(3.0, dur + 0.4)));
     }
 
-    // مقاطع
     const clips = [];
     for (let i = 0; i < imagePaths.length; i++) {
       log(`🎬 تركيب مشهد ${i + 1}...`);
@@ -352,7 +395,6 @@ async function runPipeline(opts) {
       clips.push(clip);
     }
 
-    // دمج
     log("🔗 دمج المشاهد...");
     const finalPath = path.join(jobDir, "final.mp4");
     concatClips(clips, finalPath, jobDir);
@@ -365,10 +407,19 @@ async function runPipeline(opts) {
       video: buf,
       scenes: script.scenes.length,
       duration: Math.round(durations.reduce((a, b) => a + b, 0)),
+      model: script.model,
     };
   } finally {
     fs.rmSync(jobDir, { recursive: true, force: true });
   }
 }
 
-module.exports = { runPipeline, LIMITS, LANGUAGES, RATES };
+module.exports = {
+  runPipeline,
+  generateScript,
+  LIMITS,
+  LANGUAGES,
+  RATES,
+  MODELS,
+  DEFAULT_MODEL: MODELS[0],
+};

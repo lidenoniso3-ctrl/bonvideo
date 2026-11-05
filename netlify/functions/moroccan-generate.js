@@ -1,5 +1,7 @@
 const { verifyLicense } = require("./_lib/license");
-const { runPipeline, LIMITS, LANGUAGES } = require("./_lib/moroccan");
+const {
+  runPipeline, LIMITS, LANGUAGES, DEFAULT_MODEL,
+} = require("./_lib/moroccan");
 
 exports.handler = async (event) => {
   if (event.httpMethod !== "POST")
@@ -43,7 +45,8 @@ exports.handler = async (event) => {
       rate: rate || "عادي",
       image_source: image_source || "DuckDuckGo",
       groq_key,
-      model: model || "llama-3.3-70b-versatile",
+      // ← الموديل الافتراضي الجديد + أي موديل يمرره العميل
+      model: model || DEFAULT_MODEL,
       log,
     });
 
@@ -56,6 +59,7 @@ exports.handler = async (event) => {
         "X-Video-Title":    encodeURIComponent(result.title),
         "X-Video-Scenes":   String(result.scenes),
         "X-Video-Duration": String(result.duration),
+        "X-Video-Model":    result.model,
       },
       body: result.video.toString("base64"),
       isBase64Encoded: true,
